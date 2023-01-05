@@ -59,5 +59,7 @@ sysinfo.txt
 crashlytics-build.properties
 
 # VS Code
-.vscode
+.vsconfig
 
+# MacOS
+.DS_Store
