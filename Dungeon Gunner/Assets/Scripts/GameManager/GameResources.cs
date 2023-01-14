@@ -4,33 +4,42 @@ using UnityEngine;
 
 public class GameResources : MonoBehaviour
 {
-    private static GameResources instance;
+  private static GameResources instance;
 
-    public static GameResources Instance
+  public static GameResources Instance
+  {
+    get
     {
-        get
-        {
-            if (instance == null)
-            {
-                instance =
-                    Resources.Load<GameResources>("GameResources");
-            }
+      if (instance == null)
+      {
+        instance =
+            Resources.Load<GameResources>("GameResources");
+      }
 
-            return instance;
-        }
-
-        // Not in the tutorial
-        private set { }
+      return instance;
     }
 
-    #region Header DUNGEON
-    [Space(10)]
-    [Header("Dungeon")]
-    #endregion
+    // Not in the tutorial
+    private set { }
+  }
 
-    #region Tooltip
-    [Tooltip("Populate with the dungeon RoomNodeTypeListSO")]
-    #endregion
+  #region Header DUNGEON
+  [Space(10)]
+  [Header("Dungeon")]
+  #endregion
+  #region Tooltip
+  [Tooltip("Populate with the dungeon RoomNodeTypeListSO")]
+  #endregion
 
-    public RoomNodeTypeListSO roomNodeTypeList;
+  public RoomNodeTypeListSO roomNodeTypeList;
+
+  #region Header MATERIALS
+  [Space(10)]
+  [Header("Materials")]
+  #endregion
+  #region Tooltip
+  [Tooltip("Dimmed Material")]
+  #endregion
+
+  public Material dimmedMaterial;
 }
