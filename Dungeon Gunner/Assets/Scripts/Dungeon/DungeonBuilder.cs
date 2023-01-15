@@ -167,14 +167,180 @@ public class DungeonBuilder : SingletonMonobehavior<DungeonBuilder>
         // Add room to room dictionary
         dungeonBuilderRoomDictionary.Add(room.id, room);
       }
+      // else if room type isn't an entrance
+      else
+      {
+        // Get parent room for node
+        Room parentRoom = dungeonBuilderRoomDictionary[roomNode.parentRoomNodeIDList[0]];
+
+        // See if room can be placed without overlaps
+        noRoomOverlaps = CanPlaceRoomWithNodeOverlaps(roomNode, parentRoom);
+      }
     }
+
+    return noRoomOverlaps;
+  }
+
+  /// <summary>
+  /// Attempt to place the room node in the dungeon - if room can be place return the room, else return null;
+  /// </summary>
+  private bool CanPlaceRoomWithNodeOverlaps(RoomNodeSO roomNode, Room parentRoom)
+  {
+    // Initialize and assume overlap until proven otherwise
+    bool roomOverlaps = true;
+
+
+    // Do while room ovelaps - try to place against all available doorways of parent until 
+    // the room is successfully placed without overlap.
+    while (roomOverlaps)
+    {
+      // Select random unconnected available doorway for parent
+      List<Doorway> unconnectedAvailableParentDoorways = GetUnconnectedAvailableDoorways(parentRoom.doorWayList).ToList();
+
+      if (unconnectedAvailableParentDoorways.Count == 0)
+      {
+        // If no more doorways to try, then overlap failure.
+        return false; // room overlaps;
+      }
+
+      Doorway doorwayParent = unconnectedAvailableParentDoorways[UnityEngine.Random.Range(0, unconnectedAvailableParentDoorways.Count)];
+
+      // Get a random template for room node that is consistent with the parent door orientation
+      RoomTemplateSO roomTemplate = GetRandomRoomTemplateForRoomConsitentWithParent(roomNode, doorwayParent);
+
+      // Create a room
+      Room room = CreateRoomFromRoomTemplate(roomTemplate, roomNode);
+
+      // Place the room - return true if the room doesn't overlap
+      if (PlaceTheRoom(parentRoom, doorwayParent, room))
+      {
+
+      }
+
+    }
+
+  }
+
+  /// <summary>
+  /// Get random room template for room node taking into account the parent doorway orientation
+  /// </summary>
+  private RoomTemplateSO GetRandomRoomTemplateForRoomConsitentWithParent(RoomNodeSO roomNode, Doorway doorwayParent)
+  {
+    RoomTemplateSO roomTemplate = null;
+
+    // If room node is a corridor then select random correct corridor room template based on parent doorway orientation
+    if (roomNode.roomNodeType.isCorridor)
+    {
+      switch (doorwayParent.orientation)
+      {
+        case Orientation.north:
+        case Orientation.south:
+          roomTemplate = GetRandomRoomTemplate(roomNodeTypeList.list.Find(x => x.isCorridorNS));
+          break;
+
+        case Orientation.east:
+        case Orientation.west:
+          roomTemplate = GetRandomRoomTemplate(roomNodeTypeList.list.Find(x => x.isCorridorEW));
+          break;
+
+        case Orientation.none:
+          break;
+
+        default:
+          break;
+      }
+    }
+    // Select random room template
+    else
+    {
+      roomTemplate = GetRandomRoomTemplate(roomNode.roomNodeType);
+    }
+
+    return roomTemplate;
+  }
+
+  /// <summary>
+  /// Place the room - return true if the room doesn't overlap, false if it does
+  /// </summary>
+  private bool PlaceTheRoom(Room parentRoom, Doorway doorwayParent, Room room)
+  {
+    // Get current room doorway position
+    Doorway doorway = GetOppositeDoorway(doorwayParent, room.doorWayList);
+
+    // Return false if no doorway in room opposite of parent doorway
+    if (doorway == null)
+    {
+      // Mark the parent doorway as unavailable so we don't try to connect it again
+      doorwayParent.isUnavailable = true;
+      return false;
+    }
+
+    // Calculate 'world' grid parent doorway position
+    Vector2Int parentDoorwayPosition = parentRoom.lowerBounds + doorwayParent.position - parentRoom.templateLowerBounds;
+
+    Vector2Int adjustment = Vector2Int.zero;
+
+    // Calculate adjustment position offset based on room doorway position that we are trying to connect
+    // e.g. if this doorway is west then we need to add (1, 0) to the east parent doorway
+    switch (doorway.orientation)
+    {
+      case Orientation.north:
+        adjustment = new Vector2Int(0, -1);
+        break;
+
+      case Orientation.east:
+        adjustment = new Vector2Int(-1, 0);
+        break;
+
+      case Orientation.south:
+        adjustment = new Vector2Int(0, 1);
+        break;
+
+      case Orientation.west:
+        adjustment = new Vector2Int(1, 0);
+        break;
+
+      case Orientation.none:
+        break;
+
+      default:
+        break;
+    }
+  }
+
+  /// <summary>
+  /// Get the doorway from the doorway list that has the opposite orientation to doorway
+  /// </summary>
+  private Doorway GetOppositeDoorway(Doorway parentDoorway, List<Doorway> doorwayList)
+  {
+    foreach (Doorway doorwayToCheck in doorwayList)
+    {
+      if (parentDoorway.orientation == Orientation.east && doorwayToCheck.orientation == Orientation.west)
+      {
+        return doorwayToCheck;
+      }
+      else if (parentDoorway.orientation == Orientation.west && doorwayToCheck.orientation == Orientation.east)
+      {
+        return doorwayToCheck;
+      }
+      else if (parentDoorway.orientation == Orientation.north && doorwayToCheck.orientation == Orientation.south)
+      {
+        return doorwayToCheck;
+      }
+      else if (parentDoorway.orientation == Orientation.south && doorwayToCheck.orientation == Orientation.north)
+      {
+        return doorwayToCheck;
+      }
+    }
+
+    return null;
   }
 
   /// <summary>
   /// Get a random room template from the room template list that matches the room type and return it,
   /// return null if no matching room templates found
   /// </summary>
-  private RoomTemplateSO GetRoomTemplate(RoomNodeTypeSO roomNodeType)
+  private RoomTemplateSO GetRandomRoomTemplate(RoomNodeTypeSO roomNodeType)
   {
     List<RoomTemplateSO> matchingRoomTemplateList = new List<RoomTemplateSO>();
 
@@ -199,6 +365,55 @@ public class DungeonBuilder : SingletonMonobehavior<DungeonBuilder>
   }
 
   /// <summary>
+  /// Get unconnected doorways
+  /// </summary>
+  private IEnumerable<Doorway> GetUnconnectedAvailableDoorways(List<Doorway> roomDoorwayList)
+  {
+    // Loop through doorway list
+    foreach (Doorway doorway in roomDoorwayList)
+    {
+      if (!doorway.isConnected && !doorway.isUnavailable)
+      {
+        yield return doorway;
+      }
+    }
+  }
+
+  /// <summary>
+  /// Create room based on room template and layout node, and return created room
+  /// </summary>
+  private Room CreateRoomFromRoomTemplate(RoomTemplateSO roomTemplate, RoomNodeSO roomNode)
+  {
+    // Initialize a room from template
+    Room room = new Room();
+
+    room.templateID = roomTemplate.guid;
+    room.id = roomNode.id;
+    room.prefab = roomTemplate.prefab;
+    room.roomNodeType = roomTemplate.roomNodeType;
+    room.lowerBounds = roomTemplate.lowerBounds;
+    room.upperBounds = roomTemplate.upperBounds;
+    room.spawnPositionArray = roomTemplate.spawnPositionArray;
+    room.templateLowerBounds = roomTemplate.lowerBounds;
+    room.templateUpperBounds = roomTemplate.upperBounds;
+    room.childRoomIDList = CopyStringList(roomNode.childRoomNodeIDList);
+    room.doorWayList = CopyDoorwayList(roomTemplate.doorwayList);
+
+    // Set parent ID for room
+    if (roomNode.parentRoomNodeIDList.Count == 0) // Entrance
+    {
+      room.parentRoomID = "";
+      room.isPreviouslyVisited = true;
+    }
+    else
+    {
+      room.parentRoomID = roomNode.parentRoomNodeIDList[0];
+    }
+
+    return room;
+  }
+
+  /// <summary>
   /// Select a random room node graph from the list of room node graphs
   /// </summary>
   private RoomNodeGraphSO SelectRandomRoomNodeGraph(List<RoomNodeGraphSO> roomNodeGraphList)
@@ -212,6 +427,47 @@ public class DungeonBuilder : SingletonMonobehavior<DungeonBuilder>
       Debug.Log($"No node room in graph list");
       return null;
     }
+  }
+
+  /// <summary>
+  /// Create a deep copy of doorway list
+  /// </summary>
+  private List<Doorway> CopyDoorwayList(List<Doorway> oldDoorwayList)
+  {
+    List<Doorway> newDoorwayList = new List<Doorway>();
+
+    foreach (Doorway doorway in oldDoorwayList)
+    {
+      Doorway newDoorway = new Doorway();
+
+      newDoorway.position = doorway.position;
+      newDoorway.orientation = doorway.orientation;
+      newDoorway.doorPrefab = doorway.doorPrefab;
+      newDoorway.isConnected = doorway.isConnected;
+      newDoorway.isUnavailable = doorway.isUnavailable;
+      newDoorway.doorwayStartCopyPosition = doorway.doorwayStartCopyPosition;
+      newDoorway.doorwayCopyTileWidth = doorway.doorwayCopyTileWidth;
+      newDoorway.doorwayCopyTileHeight = doorway.doorwayCopyTileHeight;
+
+      newDoorwayList.Add(newDoorway);
+    }
+
+    return newDoorwayList;
+  }
+
+  /// <summary>
+  /// Create a deep copy of string list
+  /// </summary>
+  private List<string> CopyStringList(List<string> oldStringList)
+  {
+    List<string> newStringList = new List<string>();
+
+    foreach (string stringValue in oldStringList)
+    {
+      newStringList.Add(stringValue);
+    }
+
+    return newStringList;
   }
 
   /// <summary>
