@@ -214,10 +214,22 @@ public class DungeonBuilder : SingletonMonobehavior<DungeonBuilder>
       // Place the room - return true if the room doesn't overlap
       if (PlaceTheRoom(parentRoom, doorwayParent, room))
       {
+        // If room doesn't ovelap then set to false to exit while loop
+        roomOverlaps = false;
 
+        // Mark room as positioned
+        room.isPositioned = true;
+
+        // Add room to dictionary
+        dungeonBuilderRoomDictionary.Add(room.id, room);
       }
-
+      else
+      {
+        roomOverlaps = true;
+      }
     }
+
+    return true; // no room overlaps
 
   }
 
@@ -306,6 +318,32 @@ public class DungeonBuilder : SingletonMonobehavior<DungeonBuilder>
       default:
         break;
     }
+
+    // Calculate room lower bounds and upper bounds based on positioning to align with parent doorway
+    room.lowerBounds = parentDoorwayPosition + adjustment + room.templateLowerBounds - doorway.position;
+    room.upperBounds = room.lowerBounds + room.templateUpperBounds - room.templateLowerBounds;
+
+    Room overlappingRoom = CheckForRoomOverlaps(room);
+
+    if (overlappingRoom == null)
+    {
+      // Mark the doorways as connected & unavailable
+      doorwayParent.isConnected = true;
+      doorwayParent.isUnavailable = true;
+
+      doorway.isConnected = true;
+      doorway.isUnavailable = true;
+
+      // return true to show rooms have been connected with no overlap
+      return true;
+    }
+    else
+    {
+      // Just mark the parent doorway as unavailable so we don't try to connect it again
+      doorwayParent.isUnavailable = true;
+
+      return false;
+    }
   }
 
   /// <summary>
@@ -334,6 +372,65 @@ public class DungeonBuilder : SingletonMonobehavior<DungeonBuilder>
     }
 
     return null;
+  }
+
+  /// <summary>
+  /// Check for rooms that overlap the upper and lower bounds parameters, and if there are overlapping rooms then return room else return null
+  /// </summary>
+  private Room CheckForRoomOverlaps(Room roomToTest)
+  {
+    // Iterate through all rooms
+    foreach (KeyValuePair<string, Room> keyValuePair in dungeonBuilderRoomDictionary)
+    {
+      Room room = keyValuePair.Value;
+
+      // Skip if same room as room to test for or if room hasn't been positioned
+      if (room.id == roomToTest.id || !room.isPositioned)
+      {
+        continue;
+      }
+
+      // If room overlaps
+      if (IsOverlappingRoom(roomToTest, room))
+      {
+        return room;
+      }
+    }
+
+    return null;
+  }
+
+  /// <summary>
+  /// Check if 2 rooms overlap each other - return true if they overlap or false if they don't overlap
+  /// </summary>
+  private bool IsOverlappingRoom(Room room1, Room room2)
+  {
+    bool isOverlappingX = IsOverlappingInterval(room1.lowerBounds.x, room1.upperBounds.x, room2.lowerBounds.x, room2.upperBounds.x);
+    bool isOverlappingY = IsOverlappingInterval(room1.lowerBounds.y, room1.upperBounds.y, room2.lowerBounds.y, room2.upperBounds.y);
+
+    if (isOverlappingX && isOverlappingY)
+    {
+      return true;
+    }
+    else
+    {
+      return false;
+    }
+  }
+
+  /// <summary>
+  /// Check if interval 1 is overlapping interval 2 - this method is used by the IsOverlappingRoom method
+  /// </summary>
+  private bool IsOverlappingInterval(int imin1, int imax1, int imin2, int imax2)
+  {
+    if (Mathf.Max(imin1, imin2) <= Mathf.Min(imax1, imax2))
+    {
+      return true;
+    }
+    else
+    {
+      return false;
+    }
   }
 
   /// <summary>
@@ -468,6 +565,44 @@ public class DungeonBuilder : SingletonMonobehavior<DungeonBuilder>
     }
 
     return newStringList;
+  }
+
+  /// <summary>
+  /// Instantiate the dungeon room gameobjects from the prefabs
+  /// </summary>
+  private void InstantiateRoomGameObjects()
+  {
+    // @TODO: Empty placeholder for now so that scripts can compile
+  }
+
+  /// <summary>
+  /// Get a room template by room template ID, returns null if ID doesn't exist
+  /// </summary>
+  public RoomTemplateSO GetRoomTemplate(string roomTemplateID)
+  {
+    if (roomTemplateDictionary.TryGetValue(roomTemplateID, out RoomTemplateSO roomTemplate))
+    {
+      return roomTemplate;
+    }
+    else
+    {
+      return null;
+    }
+  }
+
+  /// <summary>
+  /// Get room by roomID, if no room exists with that ID return null
+  /// </summary>
+  public Room GetRoomById(string roomID)
+  {
+    if (dungeonBuilderRoomDictionary.TryGetValue(roomID, out Room room))
+    {
+      return room;
+    }
+    else
+    {
+      return null;
+    }
   }
 
   /// <summary>
