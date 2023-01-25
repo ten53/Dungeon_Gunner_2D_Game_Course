@@ -18,6 +18,19 @@ public static class HelperUtilities
   }
 
   /// <summary>
+  /// Null value debug check
+  /// </summary>
+  public static bool ValidateCeckNullValue(Object thisObject, string fieldName, UnityEngine.Object objectToCheck)
+  {
+    if (objectToCheck == null)
+    {
+      Debug.Log(fieldName + " is null and must contain a value in object" + thisObject.name.ToString());
+      return true;
+    }
+    return false;
+  }
+
+  /// <summary>
   /// List empty or contains null value check - return true if there is an error 
   /// </summary>
   public static bool ValidateCheckEnumerableValues(Object thisObject, string fieldName, IEnumerable enumerableObjectToCheck)
@@ -50,6 +63,28 @@ public static class HelperUtilities
       error = true;
     }
 
+    return error;
+  }
+
+  public static bool ValidatePositiveValue(Object thisObject, string fieldName, int valueToCheck, bool isZeroAllowed)
+  {
+    bool error = false;
+    if (isZeroAllowed)
+    {
+      if (valueToCheck < 0)
+      {
+        Debug.Log(fieldName + " must contain a positive value or zero in object " + thisObject.name.ToString());
+        error = true;
+      }
+      else
+      {
+        if (valueToCheck <= 0)
+        {
+          Debug.Log(fieldName + " must contain a positive value in object " + thisObject.name.ToString());
+          error = true;
+        }
+      }
+    }
     return error;
   }
 }
